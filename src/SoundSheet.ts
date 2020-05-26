@@ -6,7 +6,7 @@ module sound {
         protected _isloaded: boolean;
         protected _isloading: boolean;
         protected _url: string;
-        protected _slices: { [name: string]: SheetItem };
+        protected _slices:  { [name: string]: { start: number, end: number } };
         private _cachelist: { name: string, volume: number }[];
         constructor() {
         }
@@ -40,10 +40,8 @@ module sound {
             }
             this._sound = new egret.Sound();
             this._sound.type = type;
-            this._slices = {};
-            for (var key in slices) {
-                this._slices[key] = new SheetItem(this._sound, slices[key].start, slices[key].end);
-            }
+            this._slices = slices;
+
             this._url = url;
             return this;
         }
@@ -89,7 +87,10 @@ module sound {
                 return;
             }
             if (this._slices[name]) {
-                this._slices[name].play(volume);
+                var item:SheetItem=SheetItem.from(this._sound,this._slices[name].start,this._slices[name].end)
+                item.play(volume,this,($item:SheetItem)=>{
+                    SheetItem.to($item);
+                });
             }
             return this;
         }
@@ -104,39 +105,67 @@ module sound {
         private _start: number;
         private _end: number;
         private _soundChannel: egret.SoundChannel;
-        constructor(sound: egret.Sound, start: number, end: number) {
+        private _complete:{caller:any,method:Function}
+        public initialize(sound: egret.Sound, start: number, end: number) {
             this._sound = sound;
             this._start = start;
             this._end = end;
+            return this;
         }
 
-        public play(volume: number = 1) {
+        public reset(){
             this.stop();
+            this._sound=null;
+            this._start=this._end=0;
+            if(this._complete){
+                this._complete=null;
+            }
+        }
+
+        public play(volume: number = 1,caller?:any,method?:Function) {
+            this.stop();
+            this._complete={caller:caller,method:method}
             this._soundChannel = this._sound.play(this._start, 1);
             this._soundChannel.volume = volume;
             egret.ticker.$startTick(this.render, this);
-            this._soundChannel.addEventListener(egret.Event.SOUND_COMPLETE, this.playOver, this);
+            this._soundChannel.addEventListener(egret.Event.SOUND_COMPLETE, this.end, this);
         }
 
         public stop() {
             this._soundChannel && this._soundChannel.stop();
             egret.ticker.$stopTick(this.render, this);
-            this._soundChannel && this._soundChannel.removeEventListener(egret.Event.SOUND_COMPLETE, this.playOver, this);
+            this._soundChannel && this._soundChannel.removeEventListener(egret.Event.SOUND_COMPLETE, this.end, this);
         }
 
         private render(timestamp: number) {
             if (this._end >= 0 && this._soundChannel) {
                 if (this._soundChannel.position >= this._end) {
-                    this.stop();
+                    this.end();
                 }
                 return true;
             }
-            this.stop();
+            this.end();
             return true;
         }
 
-        private playOver() {
+        private end() {
             this.stop();
+            this._complete&&this._complete.method.call(this._complete.caller,this);
+        }
+
+        private static _pool:SheetItem[]=[];
+        public static from(sound: egret.Sound, start: number, end: number){
+            if(SheetItem._pool.length){
+                return SheetItem._pool.pop().initialize(sound,start,end);
+            }
+            return new SheetItem().initialize(sound,start,end);
+        }
+
+        public static to(item:SheetItem){
+            if(SheetItem._pool.indexOf(item)==-1){
+                item.reset();
+                SheetItem._pool.push(item);
+            }
         }
     }
 }
