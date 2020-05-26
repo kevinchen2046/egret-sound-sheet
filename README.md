@@ -23,5 +23,7 @@ var sheetdata={
 }
 var sheet = new sound.SoundSheet()
 sheet.initialize(egret.Sound.EFFECT, 'resource/assets/effect.mp3',sheetdata);
-sheet.load()
+sheet.load(this,()=>{
+    sheet.play('gun');
+})
 ```
