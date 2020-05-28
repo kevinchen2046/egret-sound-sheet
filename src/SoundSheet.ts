@@ -110,6 +110,7 @@ module sound {
             this._sound = sound;
             this._start = start;
             this._end = end;
+            egret.lifecycle.stage.addEventListener(egret.Event.DEACTIVATE,this.deactivateHandler,this);
             return this;
         }
 
@@ -120,6 +121,7 @@ module sound {
             if(this._complete){
                 this._complete=null;
             }
+            egret.lifecycle.stage.removeEventListener(egret.Event.DEACTIVATE,this.deactivateHandler,this);
         }
 
         public play(volume: number = 1,caller?:any,method?:Function) {
@@ -146,6 +148,10 @@ module sound {
             }
             this.end();
             return true;
+        }
+
+        private deactivateHandler(){
+            this.end();
         }
 
         private end() {
